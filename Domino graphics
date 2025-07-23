@@ -1,0 +1,463 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Domino Bet - Jwèt ak 4 Moun</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Logo ak tit */
+        .header {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 2.5em;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #ffdd59;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        /* Tab domino */
+        .domino-table {
+            width: 600px;
+            height: 400px;
+            background: linear-gradient(45deg, #2d5a27 0%, #4a7c59 100%);
+            border-radius: 50%;
+            position: relative;
+            box-shadow: 
+                0 0 50px rgba(0,0,0,0.3),
+                inset 0 0 100px rgba(255,255,255,0.1);
+            border: 8px solid #8B4513;
+        }
+
+        /* Lajan sou tab la */
+        .money-pile {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            width: 200px;
+            height: 100px;
+        }
+
+        .money-bill {
+            width: 40px;
+            height: 20px;
+            background: linear-gradient(45deg, #228B22, #32CD32);
+            margin: 2px;
+            border-radius: 3px;
+            position: relative;
+            animation: float 3s ease-in-out infinite;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .money-bill:nth-child(even) {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            animation-delay: -1.5s;
+        }
+
+        .money-bill::before {
+            content: '$';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-weight: bold;
+            font-size: 12px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(2deg); }
+        }
+
+        /* 4 joueurs yo */
+        .player {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .player:hover {
+            transform: scale(1.1);
+        }
+
+        .player-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 5px;
+            border: 3px solid #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        /* Pozisyon 4 joueurs yo */
+        .player1 {
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .player1 .player-avatar { background: linear-gradient(135deg, #667eea, #764ba2); }
+
+        .player2 {
+            right: -100px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .player2 .player-avatar { background: linear-gradient(135deg, #f093fb, #f5576c); }
+
+        .player3 {
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .player3 .player-avatar { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+
+        .player4 {
+            left: -100px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .player4 .player-avatar { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+
+        /* Domino pieces */
+        .domino-piece {
+            width: 30px;
+            height: 60px;
+            background: #f5f5f5;
+            border: 2px solid #333;
+            border-radius: 5px;
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .domino-dot {
+            width: 6px;
+            height: 6px;
+            background: #333;
+            border-radius: 50%;
+        }
+
+        /* Domino pieces sou tab la */
+        .center-dominos {
+            position: absolute;
+            top: 40%;
+            left: 45%;
+            transform: translate(-50%, -50%);
+        }
+
+        .domino1 { top: 0; left: 0; transform: rotate(15deg); }
+        .domino2 { top: 20px; left: 40px; transform: rotate(-10deg); }
+        .domino3 { top: -10px; left: 80px; transform: rotate(25deg); }
+
+        /* Control buttons */
+        .game-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+        }
+
+        .control-btn {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255,107,107,0.3);
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255,107,107,0.4);
+        }
+
+        /* Bet info */
+        .bet-info {
+            position: absolute;
+            top: 120px;
+            right: 30px;
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            color: white;
+            min-width: 200px;
+        }
+
+        .bet-amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffdd59;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        /* Status messages */
+        .status-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 18px;
+            display: none;
+            z-index: 200;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- Header ak Logo -->
+        <div class="header">
+            <div class="logo">🎯 DOMINO BET</div>
+            <div class="subtitle">Jwèt Ayisyen 4 Moun</div>
+        </div>
+
+        <!-- Tab Domino -->
+        <div class="domino-table">
+            <!-- Lajan nan mitan tab la -->
+            <div class="money-pile">
+                <div class="money-bill"></div>
+                <div class="money-bill"></div>
+                <div class="money-bill"></div>
+                <div class="money-bill"></div>
+                <div class="money-bill"></div>
+                <div class="money-bill"></div>
+                <div class="money-bill"></div>
+                <div class="money-bill"></div>
+                <div class="money-bill"></div>
+                <div class="money-bill"></div>
+            </div>
+
+            <!-- Domino pieces sou tab la -->
+            <div class="center-dominos">
+                <div class="domino-piece domino1">
+                    <div class="domino-dot"></div>
+                    <div class="domino-dot"></div>
+                    <div style="border-top: 1px solid #333; width: 80%; margin: 2px 0;"></div>
+                    <div class="domino-dot"></div>
+                    <div class="domino-dot"></div>
+                    <div class="domino-dot"></div>
+                </div>
+                <div class="domino-piece domino2">
+                    <div class="domino-dot"></div>
+                    <div class="domino-dot"></div>
+                    <div class="domino-dot"></div>
+                    <div style="border-top: 1px solid #333; width: 80%; margin: 2px 0;"></div>
+                    <div class="domino-dot"></div>
+                </div>
+                <div class="domino-piece domino3">
+                    <div class="domino-dot"></div>
+                    <div style="border-top: 1px solid #333; width: 80%; margin: 2px 0;"></div>
+                    <div class="domino-dot"></div>
+                    <div class="domino-dot"></div>
+                    <div class="domino-dot"></div>
+                    <div class="domino-dot"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4 Joueurs yo -->
+        <div class="player player1" onclick="selectPlayer(1)">
+            <div class="player-avatar">👤</div>
+            <div>Joueur 1</div>
+        </div>
+        
+        <div class="player player2" onclick="selectPlayer(2)">
+            <div class="player-avatar">👤</div>
+            <div>Joueur 2</div>
+        </div>
+        
+        <div class="player player3" onclick="selectPlayer(3)">  
+            <div class="player-avatar">👤</div>
+            <div>Joueur 3</div>
+        </div>
+        
+        <div class="player player4" onclick="selectPlayer(4)">
+            <div class="player-avatar">👤</div>
+            <div>Joueur 4</div>
+        </div>
+
+        <!-- Bet Information -->
+        <div class="bet-info">
+            <div class="bet-amount">$500 HTG</div>
+            <div>Total nan jèt la</div>
+            <hr style="border: 1px solid rgba(255,255,255,0.3); margin: 15px 0;">
+            <div>Ou bet: <span style="color: #ffdd59;">$125 HTG</span></div>
+            <div>Status: <span style="color: #4facfe;">Ap tann...</span></div>
+        </div>
+
+        <!-- Status Message -->
+        <div class="status-message" id="statusMessage">
+            Jwèt la ap kòmanse...
+        </div>
+
+        <!-- Game Controls -->
+        <div class="game-controls">
+            <button class="control-btn" onclick="startGame()">🎮 Kòmanse</button>
+            <button class="control-btn" onclick="placeBet()">💰 Bet</button>
+            <button class="control-btn" onclick="showCards()">🎴 Kat yo</button>
+            <button class="control-btn" onclick="quitGame()">🚪 Soti</button>
+        </div>
+    </div>
+
+    <script>
+        let currentPlayer = 0;
+        let gameStarted = false;
+        let totalBet = 500;
+
+        function selectPlayer(playerNum) {
+            currentPlayer = playerNum;
+            showStatus(`Ou chwazi Joueur ${playerNum}`);
+            
+            // Reset all players
+            document.querySelectorAll('.player').forEach(p => {
+                p.style.transform = p.style.transform.replace('scale(1.2)', '');
+            });
+            
+            // Highlight selected player
+            document.querySelector(`.player${playerNum}`).style.transform += ' scale(1.2)';
+        }
+
+        function startGame() {
+            gameStarted = true;
+            showStatus("Jwèt la kòmanse! Distribye kat yo...");
+            
+            // Animate money pile
+            document.querySelectorAll('.money-bill').forEach((bill, index) => {
+                setTimeout(() => {
+                    bill.style.animation = `float 1s ease-in-out infinite`;
+                    bill.style.animationDelay = `${index * 0.1}s`;
+                }, index * 100);
+            });
+
+            setTimeout(() => {
+                showStatus("Se tou ou! Chwazi yon domino.");
+            }, 3000);
+        }
+
+        function placeBet() {
+            if (!gameStarted) {
+                showStatus("Kòmanse jwèt la premye!");
+                return;
+            }
+            
+            const betAmount = prompt("Konbyen ou vle bet? (HTG)", "50");
+            if (betAmount && !isNaN(betAmount)) {
+                totalBet += parseInt(betAmount);
+                document.querySelector('.bet-amount').textContent = `$${totalBet} HTG`;
+                showStatus(`Ou bet $${betAmount} HTG!`);
+            }
+        }
+
+        function showCards() {
+            if (!gameStarted) {
+                showStatus("Kòmanse jwèt la premye!");
+                return;
+            }
+            showStatus("Kat ou yo: 🎴 [2|3] [4|1] [6|2] [1|5] [3|4] [0|6] [2|2]");
+        }
+
+        function quitGame() {
+            if (confirm("Ou vle soti nan jwèt la?")) {
+                gameStarted = false;
+                totalBet = 500;
+                document.querySelector('.bet-amount').textContent = "$500 HTG";
+                showStatus("Ou soti nan jwèt la. Mèsi pou te jwe!");
+            }
+        }
+
+        function showStatus(message) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.style.display = 'block';
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 3000);
+        }
+
+        // Auto-start demo
+        setTimeout(() => {
+            showStatus("Bienvini nan Domino Bet! Chwazi yon joueur pou kòmanse.");
+        }, 1000);
+
+        // Simulate game activity
+        setInterval(() => {
+            if (gameStarted && Math.random() > 0.7) {
+                const messages = [
+                    "Joueur 2 jwe yon domino...",
+                    "Joueur 3 ap tann...",
+                    "Se tou Joueur 4!",
+                    "Bon kout! +25 HTG",
+                    "Joueur 1 gen 3 domino ki rete"
+                ];
+                showStatus(messages[Math.floor(Math.random() * messages.length)]);
+            }
+        }, 8000);
+    </script>
+</body>
+</html>
