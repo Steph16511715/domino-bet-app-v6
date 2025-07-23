@@ -1,0 +1,29 @@
+<svg width="420" height="300" viewBox="0 0 420 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="80" y="100" width="260" height="100" rx="22" fill="#eee" stroke="#333" stroke-width="4"/>
+  <!-- Domino pieces on table -->
+  <rect x="170" y="135" width="28" height="14" rx="3" fill="#fff" stroke="#222" stroke-width="2"/>
+  <rect x="200" y="145" width="30" height="14" rx="3" fill="#fff" stroke="#222" stroke-width="2"/>
+  <rect x="230" y="130" width="14" height="28" rx="3" fill="#fff" stroke="#222" stroke-width="2"/>
+  <circle cx="184" cy="142" r="2.5" fill="#222"/>
+  <circle cx="208" cy="152" r="2.5" fill="#222"/>
+  <circle cx="244" cy="140" r="2.5" fill="#222"/>
+  <circle cx="216" cy="152" r="2.5" fill="#222"/>
+  <circle cx="218" cy="136" r="2.5" fill="#222"/>
+  <!-- Players -->
+  <circle cx="110" cy="120" r="30" fill="#ffb900" stroke="#222" stroke-width="3"/>
+  <circle cx="310" cy="120" r="30" fill="#00bfff" stroke="#222" stroke-width="3"/>
+  <circle cx="110" cy="180" r="30" fill="#a4de02" stroke="#222" stroke-width="3"/>
+  <circle cx="310" cy="180" r="30" fill="#e74c3c" stroke="#222" stroke-width="3"/>
+  <!-- US Dollars -->
+  <rect x="95" y="95" width="17" height="10" rx="2" fill="#c6e672" stroke="#222" stroke-width="1.5"/>
+  <rect x="305" y="95" width="17" height="10" rx="2" fill="#c6e672" stroke="#222" stroke-width="1.5"/>
+  <rect x="95" y="195" width="17" height="10" rx="2" fill="#c6e672" stroke="#222" stroke-width="1.5"/>
+  <rect x="305" y="195" width="17" height="10" rx="2" fill="#c6e672" stroke="#222" stroke-width="1.5"/>
+  <!-- $ sign -->
+  <text x="103" y="104" font-size="9" font-family="Arial" fill="#222">$</text>
+  <text x="313" y="104" font-size="9" font-family="Arial" fill="#222">$</text>
+  <text x="103" y="204" font-size="9" font-family="Arial" fill="#222">$</text>
+  <text x="313" y="204" font-size="9" font-family="Arial" fill="#222">$</text>
+  <!-- Table shadow -->
+  <ellipse cx="210" cy="200" rx="110" ry="18" fill="#ccc" fill-opacity="0.5"/>
+</svg>
