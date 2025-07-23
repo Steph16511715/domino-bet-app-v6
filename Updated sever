@@ -1,0 +1,164 @@
+
+// server.js - Updated server ak database ak SMS
+import express from 'express';
+import cors from 'cors';
+import { DominoDatabase, SMSGateway, GameManager } from './database.js';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// Initialize services
+const database = new DominoDatabase();
+const smsGateway = new SMSGateway();
+const gameManager = new GameManager(database, smsGateway);
+
+// Initialize database
+await database.initialize();
+
+// Root endpoint
+app.get('/', (req, res) => {
+    res.json({ 
+        message: 'Domino Bet API v2.0',
+        status: 'running',
+        features: ['SMS Gateway', 'Database', 'Real-time Games']
+    });
+});
+
+// Player registration endpoints
+app.post('/auth/register', async (req, res) => {
+    const { phone, username } = req.body;
+    
+    if (!phone || !username) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Telefòn ak non yo obligatwa' 
+        });
+    }
+
+    try {
+        const result = await gameManager.registerPlayer(phone, username);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erè sèvè', 
+            error: error.message 
+        });
+    }
+});
+
+app.post('/auth/verify', async (req, res) => {
+    const { phone, code, username } = req.body;
+    
+    if (!phone || !code || !username) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Tout enfòmasyon yo obligatwa' 
+        });
+    }
+
+    try {
+        const result = await gameManager.verifyAndCreatePlayer(phone, code, username);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erè verifikasyon', 
+            error: error.message 
+        });
+    }
+});
+
+app.post('/auth/login', async (req, res) => {
+    const { phone } = req.body;
+    
+    if (!phone) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Nimewo telefòn obligatwa' 
+        });
+    }
+
+    try {
+        const player = await database.getPlayer(phone);
+        if (player) {
+            // Send login code
+            const code = await database.createSMSCode(phone);
+            await smsGateway.sendVerificationCode(phone, code);
+            
+            res.json({ 
+                success: true, 
+                message: 'Kòd koneksyon voye nan telefòn ou a' 
+            });
+        } else {
+            res.status(404).json({ 
+                success: false, 
+                message: 'Jwè pa jwenn. Ou bezwen kont?' 
+            });
+        }
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erè koneksyon', 
+            error: error.message 
+        });
+    }
+});
+
+app.post('/auth/verify-login', async (req, res) => {
+    const { phone, code } = req.body;
+    
+    try {
+        const verification = await database.verifySMSCode(phone, code);
+        if (verification.success) {
+            const player = await database.getPlayer(phone);
+            
+            // Update last login
+            await database.db.run(
+                'UPDATE players SET last_login = datetime("now") WHERE id = ?',
+                [player.id]
+            );
+
+            res.json({ 
+                success: true, 
+                player: {
+                    id: player.id,
+                    username: player.username,
+                    balance: player.balance,
+                    wins: player.wins,
+                    losses: player.losses
+                }
+            });
+        } else {
+            res.status(400).json(verification);
+        }
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erè koneksyon', 
+            error: error.message 
+        });
+    }
+});
+
+// Game management endpoints
+app.post('/game/create', async (req, res) => {
+    const { playerId, betAmount } = req.body;
+    
+    if (!playerId || !betAmount) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Player ID ak bet amount obligatwa' 
+        });
+    }
+
+    try {
+        const session = await gameManager.createGame(playerId, betAmount);
+        res.json({ 
+            success: true, 
+            sessionCode: session.sessionCode,
+            message: `Jwèt kreye ak kòd: ${session.sessionCode}` 
+        });
+    } catch (error) {
+        res.status(500).json({
