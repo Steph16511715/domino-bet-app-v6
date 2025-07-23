@@ -1,0 +1,408 @@
+
+// database.js - Database setup ak player management
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
+
+class DominoDatabase {
+    constructor() {
+        this.db = null;
+    }
+
+    async initialize() {
+        // Open SQLite database
+        this.db = await open({
+            filename: './domino_game.db',
+            driver: sqlite3.Database
+        });
+
+        // Create tables
+        await this.createTables();
+        console.log('Database initialized successfully!');
+    }
+
+    async createTables() {
+        // Players table
+        await this.db.exec(`
+            CREATE TABLE IF NOT EXISTS players (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone VARCHAR(15) UNIQUE NOT NULL,
+                username VARCHAR(50) NOT NULL,
+                balance INTEGER DEFAULT 1000,
+                wins INTEGER DEFAULT 0,
+                losses INTEGER DEFAULT 0,
+                total_games INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_login DATETIME DEFAULT CURRENT_TIMESTAMP,
+                status VARCHAR(20) DEFAULT 'active'
+            )
+        `);
+
+        // Game sessions table
+        await this.db.exec(`
+            CREATE TABLE IF NOT EXISTS game_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_code VARCHAR(10) UNIQUE NOT NULL,
+                pot_amount INTEGER DEFAULT 0,
+                max_players INTEGER DEFAULT 4,
+                current_players INTEGER DEFAULT 0,
+                status VARCHAR(20) DEFAULT 'waiting',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                started_at DATETIME,
+                ended_at DATETIME,
+                winner_id INTEGER,
+                FOREIGN KEY (winner_id) REFERENCES players(id)
+            )
+        `);
+
+        // Game participants table
+        await this.db.exec(`
+            CREATE TABLE IF NOT EXISTS game_participants (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                player_id INTEGER NOT NULL,
+                bet_amount INTEGER NOT NULL,
+                position INTEGER NOT NULL,
+                joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                left_at DATETIME,
+                FOREIGN KEY (session_id) REFERENCES game_sessions(id),
+                FOREIGN KEY (player_id) REFERENCES players(id)
+            )
+        `);
+
+        // Transactions table
+        await this.db.exec(`
+            CREATE TABLE IF NOT EXISTS transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_id INTEGER NOT NULL,
+                type VARCHAR(20) NOT NULL,
+                amount INTEGER NOT NULL,
+                description TEXT,
+                reference VARCHAR(50),
+                status VARCHAR(20) DEFAULT 'pending',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (player_id) REFERENCES players(id)
+            )
+        `);
+
+        // SMS verification codes table
+        await this.db.exec(`
+            CREATE TABLE IF NOT EXISTS sms_codes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone VARCHAR(15) NOT NULL,
+                code VARCHAR(6) NOT NULL,
+                expires_at DATETIME NOT NULL,
+                verified BOOLEAN DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+    }
+
+    // Player methods
+    async createPlayer(phone, username) {
+        try {
+            const result = await this.db.run(
+                'INSERT INTO players (phone, username) VALUES (?, ?)',
+                [phone, username]
+            );
+            return { success: true, playerId: result.lastID };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getPlayer(phone) {
+        return await this.db.get('SELECT * FROM players WHERE phone = ?', [phone]);
+    }
+
+    async updatePlayerBalance(playerId, amount, description = '') {
+        const transaction = await this.db.run('BEGIN TRANSACTION');
+        try {
+            // Update player balance
+            await this.db.run(
+                'UPDATE players SET balance = balance + ? WHERE id = ?',
+                [amount, playerId]
+            );
+
+            // Record transaction
+            await this.db.run(
+                'INSERT INTO transactions (player_id, type, amount, description, status) VALUES (?, ?, ?, ?, ?)',
+                [playerId, amount > 0 ? 'credit' : 'debit', Math.abs(amount), description, 'completed']
+            );
+
+            await this.db.run('COMMIT');
+            return { success: true };
+        } catch (error) {
+            await this.db.run('ROLLBACK');
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Game session methods
+    async createGameSession(potAmount = 1000) {
+        const sessionCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const result = await this.db.run(
+            'INSERT INTO game_sessions (session_code, pot_amount) VALUES (?, ?)',
+            [sessionCode, potAmount]
+        );
+        return { sessionId: result.lastID, sessionCode };
+    }
+
+    async joinGameSession(sessionId, playerId, betAmount, position) {
+        const transaction = await this.db.run('BEGIN TRANSACTION');
+        try {
+            // Check if player has enough balance
+            const player = await this.db.get('SELECT balance FROM players WHERE id = ?', [playerId]);
+            if (player.balance < betAmount) {
+                throw new Error('Insufficient balance');
+            }
+
+            // Add participant
+            await this.db.run(
+                'INSERT INTO game_participants (session_id, player_id, bet_amount, position) VALUES (?, ?, ?, ?)',
+                [sessionId, playerId, betAmount, position]
+            );
+
+            // Update session
+            await this.db.run(
+                'UPDATE game_sessions SET current_players = current_players + 1, pot_amount = pot_amount + ? WHERE id = ?',
+                [betAmount, sessionId]
+            );
+
+            // Deduct bet from player
+            await this.updatePlayerBalance(playerId, -betAmount, `Bet nan jwèt ${sessionId}`);
+
+            await this.db.run('COMMIT');
+            return { success: true };
+        } catch (error) {
+            await this.db.run('ROLLBACK');
+            return { success: false, error: error.message };
+        }
+    }
+
+    // SMS verification methods
+    async createSMSCode(phone) {
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        await this.db.run(
+            'INSERT INTO sms_codes (phone, code, expires_at) VALUES (?, ?, ?)',
+            [phone, code, expiresAt.toISOString()]
+        );
+
+        return code;
+    }
+
+    async verifySMSCode(phone, code) {
+        const record = await this.db.get(
+            'SELECT * FROM sms_codes WHERE phone = ? AND code = ? AND expires_at > datetime("now") AND verified = 0',
+            [phone, code]
+        );
+
+        if (record) {
+            await this.db.run('UPDATE sms_codes SET verified = 1 WHERE id = ?', [record.id]);
+            return { success: true };
+        }
+
+        return { success: false, error: 'Invalid or expired code' };
+    }
+}
+
+// SMS Gateway Integration
+class SMSGateway {
+    constructor() {
+        // Configure ak SMS provider ou a (Twilio, TextMagic, oswa local provider)
+        this.provider = 'twilio'; // Chanje selon provider ou a
+        this.config = {
+            twilio: {
+                accountSid: process.env.TWILIO_ACCOUNT_SID || 'your_account_sid',
+                authToken: process.env.TWILIO_AUTH_TOKEN || 'your_auth_token',
+                fromNumber: process.env.TWILIO_PHONE_NUMBER || '+1234567890'
+            },
+            local: {
+                apiUrl: process.env.LOCAL_SMS_API || 'http://localhost:3002/send-sms',
+                apiKey: process.env.LOCAL_SMS_KEY || 'your_api_key'
+            }
+        };
+    }
+
+    async sendSMS(phone, message) {
+        try {
+            switch (this.provider) {
+                case 'twilio':
+                    return await this.sendTwilioSMS(phone, message);
+                case 'local':
+                    return await this.sendLocalSMS(phone, message);
+                default:
+                    throw new Error('SMS provider not configured');
+            }
+        } catch (error) {
+            console.error('SMS sending failed:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async sendTwilioSMS(phone, message) {
+        // Twilio integration
+        const twilio = require('twilio');
+        const client = twilio(this.config.twilio.accountSid, this.config.twilio.authToken);
+
+        const result = await client.messages.create({
+            body: message,
+            from: this.config.twilio.fromNumber,
+            to: phone
+        });
+
+        return { success: true, messageId: result.sid };
+    }
+
+    async sendLocalSMS(phone, message) {
+        // Local SMS gateway integration
+        const response = await fetch(this.config.local.apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.config.local.apiKey}`
+            },
+            body: JSON.stringify({
+                phone: phone,
+                message: message
+            })
+        });
+
+        const result = await response.json();
+        return { success: response.ok, ...result };
+    }
+
+    async sendVerificationCode(phone, code) {
+        const message = `Kòd verifikasyon Domino Bet ou a: ${code}. Kòd la expire nan 10 minit.`;
+        return await this.sendSMS(phone, message);
+    }
+
+    async sendGameNotification(phone, message) {
+        return await this.sendSMS(phone, `🎯 Domino Bet: ${message}`);
+    }
+}
+
+// Game Logic Manager
+class GameManager {
+    constructor(database, smsGateway) {
+        this.db = database;
+        this.sms = smsGateway;
+        this.activeSessions = new Map();
+    }
+
+    async registerPlayer(phone, username) {
+        // Check if player exists
+        let player = await this.db.getPlayer(phone);
+        
+        if (!player) {
+            // Create verification code
+            const code = await this.db.createSMSCode(phone);
+            
+            // Send SMS
+            await this.sms.sendVerificationCode(phone, code);
+            
+            return { 
+                success: true, 
+                message: 'Kòd verifikasyon voye nan telefòn ou a',
+                needsVerification: true 
+            };
+        }
+
+        return { success: true, player, needsVerification: false };
+    }
+
+    async verifyAndCreatePlayer(phone, code, username) {
+        const verification = await this.db.verifySMSCode(phone, code);
+        
+        if (verification.success) {
+            const result = await this.db.createPlayer(phone, username);
+            if (result.success) {
+                await this.sms.sendGameNotification(phone, 'Byenvini nan Domino Bet! Ou gen 1000 HTG pou kòmanse.');
+                return { success: true, playerId: result.playerId };
+            }
+        }
+
+        return { success: false, error: 'Verification failed' };
+    }
+
+    async createGame(hostPlayerId, betAmount) {
+        const session = await this.db.createGameSession(betAmount);
+        
+        // Host joins automatically
+        await this.db.joinGameSession(session.sessionId, hostPlayerId, betAmount, 1);
+        
+        this.activeSessions.set(session.sessionId, {
+            sessionCode: session.sessionCode,
+            players: [hostPlayerId],
+            status: 'waiting'
+        });
+
+        return session;
+    }
+
+    async joinGame(sessionCode, playerId, betAmount) {
+        // Find session
+        const session = await this.db.db.get(
+            'SELECT * FROM game_sessions WHERE session_code = ? AND status = "waiting"',
+            [sessionCode]
+        );
+
+        if (!session) {
+            return { success: false, error: 'Game not found or already started' };
+        }
+
+        if (session.current_players >= 4) {
+            return { success: false, error: 'Game is full' };
+        }
+
+        const position = session.current_players + 1;
+        const result = await this.db.joinGameSession(session.id, playerId, betAmount, position);
+
+        if (result.success) {
+            // Notify all players
+            const participants = await this.db.db.all(
+                `SELECT p.phone FROM game_participants gp 
+                 JOIN players p ON gp.player_id = p.id 
+                 WHERE gp.session_id = ?`,
+                [session.id]
+            );
+
+            for (const participant of participants) {
+                await this.sms.sendGameNotification(
+                    participant.phone,
+                    `Jwè nouvo rantre nan jwèt ${sessionCode}! ${session.current_players + 1}/4 jwè yo`
+                );
+            }
+
+            // Start game if 4 players
+            if (session.current_players + 1 >= 4) {
+                await this.startGame(session.id);
+            }
+        }
+
+        return result;
+    }
+
+    async startGame(sessionId) {
+        await this.db.db.run(
+            'UPDATE game_sessions SET status = "playing", started_at = datetime("now") WHERE id = ?',
+            [sessionId]
+        );
+
+        // Notify all players game started
+        const participants = await this.db.db.all(
+            `SELECT p.phone FROM game_participants gp 
+             JOIN players p ON gp.player_id = p.id 
+             WHERE gp.session_id = ?`,
+            [sessionId]
+        );
+
+        for (const participant of participants) {
+            await this.sms.sendGameNotification(participant.phone, 'Jwèt la kòmanse! 🎲');
+        }
+    }
+}
+
+// Export classes
+export { DominoDatabase, SMSGateway, GameManager };
